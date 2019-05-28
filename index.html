@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+<title>录制视频</title>
+
+<style></style>
+</head>
+<body>
+<video autoplay webkit-playsinline playsinline x5-playsinline x-webkit-airplay="allow" id="video1" style="width: 100%;height: 300px; background: #aaa;"></video><br><br>
+<button onclick="openV()">打开摄像头</button><br><br><br>
+<button onclick="startV()">开始录制</button><br><br><br>
+<button onclick="stopV()">保存</button>
+
+<script>
+  var MediaUtils = {
+    recorder: null,
+    /**
+     * 获取用户媒体设备(处理兼容的问题)
+     * @param videoEnable {boolean} - 是否启用摄像头
+     * @param audioEnable {boolean} - 是否启用麦克风
+     * @param callback {Function} - 处理回调
+     */
+    getUserMedia: function (videoEnable, audioEnable, callback) {
+      navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia
+        || navigator.msGetUserMedia || window.getUserMedia;
+      var constraints = {video: videoEnable, audio: audioEnable};
+
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia(constraints).then(function (stream) {
+          callback(null, stream);
+        }).catch(function(err) {
+          callback(err);
+        });
+      } else if (navigator.getUserMedia) {
+        navigator.getUserMedia(constraints, function (stream) {
+          callback(null, stream);
+        }, function (err) {
+          callback(err);
+        });
+      } else {
+        callback(new Error('Not support userMedia'));
+      }
+    },
+    /**
+     * 播放视频流
+     * @param video {elem} - video标签
+     * @param stream {stream} - 媒体流
+     */
+    livePlay: function (video, stream) {
+      video.srcObject = stream;
+      video.play();
+    },
+    /**
+     * 开始录制视频
+     * @param stream {stream} - 媒体流
+     */
+    startRecord: function (stream) {
+      if (MediaRecorder in window) {
+        // 通过 MediaRecorder 记录获取到的媒体流
+        var recorder = new MediaRecorder(stream);
+
+        recorder.chunks = [];
+        recorder.ondataavailable = function (e) {
+          recorder.chunks.push(e.data);
+        };
+        recorder.start();
+        MediaUtils.recorder = recorder;
+      }
+    },
+    /**
+     * 停止录制视频
+     * @param stream {stream} - 媒体流
+     * @param callback {Function} - 处理回调
+     */
+    stopRecord: function (stream, callback) {
+      var recorder = MediaUtils.recorder;
+      if (recorder) {
+        recorder.onstop = function (e) {
+          var file = new Blob(recorder.chunks, {'type': recorder.mimeType || 'video/mp4'});
+          recorder.chunks = [];
+          callback(file);
+        };
+        // 终止录制器
+        recorder.stop();
+        // 关闭媒体流
+        if (typeof stream.stop === 'function') {
+          stream.stop();
+        } else {
+          var tracks = mediaStream.getTracks();
+          for (var i = 0, len = tracks.length; i < len; i++) {
+            var track = tracks[i];
+            if (typeof track.stop === 'function') {
+              track.stop();
+            }
+          }
+        }
+      }
+    },
+  };
+</script>
+<script>
+var mediaStream;
+function openV() {
+  var video = document.getElementById('video1');
+
+  MediaUtils.getUserMedia(true, true, function (err, stream) {
+    if (err) {
+      alert(err);
+      return;
+    }
+  
+    mediaStream = stream;
+    MediaUtils.livePlay(video, stream);
+  })
+}
+function startV() {
+    MediaUtils.startRecord(mediaStream);
+}
+function stopV() {
+  MediaUtils.stopRecord(mediaStream, function (file) {
+    alert('视频文件大小：' + file.size);
+  });
+}
+</script>
+</body>
+</html>
